@@ -2,13 +2,9 @@ package shadowsocks
 
 import (
 	"crypto/cipher"
-	"crypto/hmac"
-	"crypto/sha256"
-	"hash/crc64"
 	"strings"
 	"sync"
 
-	"github.com/xtls/xray-core/common/dice"
 	"github.com/xtls/xray-core/common/protocol"
 )
 
@@ -16,9 +12,6 @@ import (
 type Validator struct {
 	sync.RWMutex
 	users []*protocol.MemoryUser
-
-	behaviorSeed  uint64
-	behaviorFused bool
 }
 
 var (
@@ -35,12 +28,6 @@ func (v *Validator) Add(u *protocol.MemoryUser) error {
 		return newError("The cipher is not support Single-port Multi-user")
 	}
 	v.users = append(v.users, u)
-
-	if !v.behaviorFused {
-		hashkdf := hmac.New(sha256.New, []byte("SSBSKDF"))
-		hashkdf.Write(account.Key)
-		v.behaviorSeed = crc64.Update(v.behaviorSeed, crc64.MakeTable(crc64.ECMA), hashkdf.Sum(nil))
-	}
 
 	return nil
 }
@@ -114,15 +101,4 @@ func (v *Validator) Get(bs []byte, command protocol.RequestCommand) (u *protocol
 	}
 
 	return nil, nil, nil, 0, ErrNotFound
-}
-
-func (v *Validator) GetBehaviorSeed() uint64 {
-	v.Lock()
-	defer v.Unlock()
-
-	v.behaviorFused = true
-	if v.behaviorSeed == 0 {
-		v.behaviorSeed = dice.RollUint64()
-	}
-	return v.behaviorSeed
 }
